@@ -18,18 +18,20 @@ router.post("/", upload.single("image"), async (req, res) => {
   try {
     const { title, content, slug } = req.body;
     if (!title || !content || !slug) {
-      return res.status(400).json({ error: "All fields (title, content, slug) are required" });
+      return res.status(400).json({ error: "All fields are required" });
     }
 
-    const imagePath = req.file ? `/uploads/${req.file.filename}` : null;
+    const imagePath = req.file ? req.file.path : null; // Cloudinary URL
 
     const newBlog = new Blog({ title, content, slug, image: imagePath });
     await newBlog.save();
+    
     res.status(201).json({ message: "Blog created successfully", blog: newBlog });
   } catch (error) {
     res.status(500).json({ error: error.message || "Failed to create blog" });
   }
 });
+
 
 // Update a blog post
 router.put("/:slug", upload.single("image"), async (req, res) => {
