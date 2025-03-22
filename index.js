@@ -39,13 +39,13 @@ app.use("/api/blogs",blogRoutes)
 app.use("/api/services",serviceRoutes)
 
 
-// Serve static files from React build
-app.use(express.static(path.join(__dirname, "client", "build")));
+// // Serve static files from React build
+// app.use(express.static(path.join(__dirname, "client", "build")));
 
-// Catch-all route to serve `index.html`
-app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "client", "build", "index.html"));
-});
+// // Catch-all route to serve `index.html`
+// app.get("*", (req, res) => {
+//   res.sendFile(path.join(__dirname, "client", "build", "index.html"));
+// });
 
 // Start Server
 app.listen(PORT, () => console.log(` Server running on port ${PORT}`));
