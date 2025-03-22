@@ -1,35 +1,12 @@
 const express = require("express");
 const Blog = require("../models/Blog");
-const upload = require("../middleware/upload"); // Multer middleware for Cloudinary
+const upload = require("../middleware/upload"); 
+const { authMiddleware, adminMiddleware } = require("../middleware/auth");
+
 const router = express.Router();
-const slugify = require("slugify");
 
-//  GET all blogs
-router.get("/", async (req, res) => {
-  try {
-    const blogs = await Blog.find().sort({ createdAt: -1 });
-    res.status(200).json(blogs);
-  } catch (error) {
-    res.status(500).json({ error: error.message || "Failed to fetch blogs" });
-  }
-});
-
-// Get a single blog by slug
-router.get("/:slug", async (req, res) => {
-  try {
-    const blog = await Blog.findOne({ slug: req.params.slug });
-    if (!blog) {
-      return res.status(404).json({ error: "Blog not found" });
-    }
-    res.status(200).json(blog);
-  } catch (error) {
-    res.status(500).json({ error: error.message || "Failed to fetch blog" });
-  }
-});
-
-
-//  CREATE a new blog with image upload
-router.post("/", upload.single("image"), async (req, res) => {
+// CREATE a blog (Admin only)
+router.post("/", authMiddleware, adminMiddleware, upload.single("image"), async (req, res) => {
   try {
     let { title, content, slug, category } = req.body;
 
@@ -37,7 +14,6 @@ router.post("/", upload.single("image"), async (req, res) => {
       return res.status(400).json({ error: "Title, content, and category are required" });
     }
 
-    // Auto-generate slug if missing or incorrect
     slug = slug ? slugify(slug, { lower: true, strict: true }) : slugify(title, { lower: true, strict: true });
 
     const imagePath = req.file ? req.file.path : null;
@@ -50,8 +26,9 @@ router.post("/", upload.single("image"), async (req, res) => {
     res.status(500).json({ error: error.message || "Failed to create blog" });
   }
 });
-//  UPDATE a blog post
-router.put("/:slug", upload.single("image"), async (req, res) => {
+
+// UPDATE a blog (Admin only)
+router.put("/:slug", authMiddleware, adminMiddleware, upload.single("image"), async (req, res) => {
   try {
     const { title, content, category } = req.body;
 
@@ -59,7 +36,6 @@ router.put("/:slug", upload.single("image"), async (req, res) => {
       return res.status(400).json({ error: "Title, content, and category are required" });
     }
 
-    // Handle image update (use Cloudinary URL if new image is uploaded)
     const imagePath = req.file ? req.file.path : req.body.image;
 
     const updatedBlog = await Blog.findOneAndUpdate(
@@ -76,8 +52,8 @@ router.put("/:slug", upload.single("image"), async (req, res) => {
   }
 });
 
-// DELETE a blog post
-router.delete("/:slug", async (req, res) => {
+// DELETE a blog (Admin only)
+router.delete("/:slug", authMiddleware, adminMiddleware, async (req, res) => {
   try {
     const deletedBlog = await Blog.findOneAndDelete({ slug: req.params.slug });
     if (!deletedBlog) return res.status(404).json({ error: "Blog not found" });

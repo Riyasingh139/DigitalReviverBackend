@@ -1,64 +1,67 @@
 const express = require("express");
 const Service = require("../models/Service");
+const upload = require("../middleware/upload");
+const { authMiddleware, adminMiddleware } = require("../middleware/auth");
+const slugify = require("slugify");
+
 const router = express.Router();
 
-// Get all services
-router.get("/", async (req, res) => {
+// CREATE a new service (Admin only)
+router.post("/", authMiddleware, adminMiddleware, upload.single("image"), async (req, res) => {
   try {
-    const services = await Service.find();
-    res.json(services);
-  } catch (error) {
-    res.status(500).json({ error: "Internal Server Error" });
-  }
-});
+    let { title, description, slug, price } = req.body;
 
-// Get a single service by slug
-router.get("/:slug", async (req, res) => {
-  try {
-    const service = await Service.findOne({ slug: req.params.slug });
-    if (!service) return res.status(404).json({ error: "Service not found" });
-    res.json(service);
-  } catch (error) {
-    res.status(500).json({ error: "Internal Server Error" });
-  }
-});
+    if (!title || !description || !price) {
+      return res.status(400).json({ error: "Title, description, and price are required" });
+    }
 
-// Create a new service
-router.post("/", async (req, res) => {
-  try {
-    const { name, description, slug, price, image } = req.body;
-    const newService = new Service({ name, description, slug, price, image });
+    slug = slug ? slugify(slug, { lower: true, strict: true }) : slugify(title, { lower: true, strict: true });
+
+    const imagePath = req.file ? req.file.path : null;
+    const newService = new Service({ title, description, slug, price, image: imagePath });
+
     await newService.save();
-    res.status(201).json(newService);
+    res.status(201).json({ message: "Service created successfully", service: newService });
+
   } catch (error) {
-    res.status(500).json({ error: "Internal Server Error" });
+    res.status(500).json({ error: error.message || "Failed to create service" });
   }
 });
 
-// Update a service
-router.put("/:slug", async (req, res) => {
+// UPDATE a service (Admin only)
+router.put("/:slug", authMiddleware, adminMiddleware, upload.single("image"), async (req, res) => {
   try {
-    const { name, description, price, image } = req.body;
-    const service = await Service.findOneAndUpdate(
+    const { title, description, price } = req.body;
+
+    if (!title || !description || !price) {
+      return res.status(400).json({ error: "Title, description, and price are required" });
+    }
+
+    const imagePath = req.file ? req.file.path : req.body.image;
+
+    const updatedService = await Service.findOneAndUpdate(
       { slug: req.params.slug },
-      { name, description, price, image },
+      { title, description, price, image: imagePath },
       { new: true }
     );
-    if (!service) return res.status(404).json({ error: "Service not found" });
-    res.json(service);
+
+    if (!updatedService) return res.status(404).json({ error: "Service not found" });
+
+    res.status(200).json({ message: "Service updated successfully", service: updatedService });
   } catch (error) {
-    res.status(500).json({ error: "Internal Server Error" });
+    res.status(500).json({ error: error.message || "Failed to update service" });
   }
 });
 
-// Delete a service
-router.delete("/:slug", async (req, res) => {
+// DELETE a service (Admin only)
+router.delete("/:slug", authMiddleware, adminMiddleware, async (req, res) => {
   try {
-    const service = await Service.findOneAndDelete({ slug: req.params.slug });
-    if (!service) return res.status(404).json({ error: "Service not found" });
-    res.json({ message: "Service deleted successfully" });
+    const deletedService = await Service.findOneAndDelete({ slug: req.params.slug });
+    if (!deletedService) return res.status(404).json({ error: "Service not found" });
+
+    res.status(200).json({ message: "Service deleted successfully" });
   } catch (error) {
-    res.status(500).json({ error: "Internal Server Error" });
+    res.status(500).json({ error: error.message || "Failed to delete service" });
   }
 });
 

@@ -49,4 +49,8 @@ router.post("/login", async (req, res) => {
   }
 });
 
+router.get("/check", authMiddleware, (req, res) => {
+  res.json({ isAdmin: req.user.role === "admin" });
+});
+
 module.exports = router;
