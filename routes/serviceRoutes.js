@@ -1,7 +1,7 @@
 const express = require("express");
 const Service = require("../models/Service");
 const upload = require("../middleware/upload");
-const { authMiddleware, adminMiddleware } = require("../middleware/auth");
+const { authMiddleware, adminMiddleware } = require("../middleware/authMiddleware");
 const slugify = require("slugify");
 
 const router = express.Router();

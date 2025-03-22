@@ -1,7 +1,7 @@
 const express = require("express");
 const moment = require("moment-timezone");
 const Popup = require("../models/Popup");
-const verifyAdmin = require("../middleware/authMiddleware");
+const { verifyAdmin } = require("../middleware/authMiddleware");
 const transporter = require("../config/mailer");
 
 const router = express.Router();

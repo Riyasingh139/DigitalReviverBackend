@@ -1,9 +1,12 @@
 const express = require("express");
 const Blog = require("../models/Blog");
 const upload = require("../middleware/upload"); 
-const { authMiddleware, adminMiddleware } = require("../middleware/auth");
+const { authMiddleware, adminMiddleware } = require("../middleware/authMiddleware");
 
 const router = express.Router();
+
+
+const slugify = require("slugify");
 
 // CREATE a blog (Admin only)
 router.post("/", authMiddleware, adminMiddleware, upload.single("image"), async (req, res) => {
