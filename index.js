@@ -31,7 +31,7 @@ app.use("/uploads", express.static("uploads")); // Serve images statically
 connectDB();
 
 // Routes
-app.use("/api", require("./routes/apiRoutes")); 
+// app.use("/api", require("./routes/apiRoutes")); 
 
 app.use("/admin", adminRoutes);
 app.use("/popup", popupRoutes);
