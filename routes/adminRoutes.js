@@ -2,7 +2,7 @@ const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const Admin = require("../models/Admin");
-const { authMiddleware } = require("../middleware/authMiddleware");
+const { authMiddleware , adminMiddleware } = require("../middleware/authMiddleware");
 
 const router = express.Router();
 
@@ -49,8 +49,9 @@ router.post("/login", async (req, res) => {
   }
 });
 
-router.get("/admin/check", authMiddleware, (req, res) => {
-  res.json({ isAdmin: req.user.role === "admin" });
+router.get("/check", authMiddleware, adminMiddleware, (req, res) => {
+  res.status(200).json({ isAdmin: true });
 });
+
 
 module.exports = router;
