@@ -6,6 +6,16 @@ const slugify = require("slugify");
 
 const router = express.Router();
 
+
+// Get all services
+router.get("/", async (req, res) => {
+  try {
+    const services = await Service.find();
+    res.json(services);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 // CREATE a new service (Admin only)
 router.post("/", authMiddleware, adminMiddleware, upload.single("image"), async (req, res) => {
   try {
