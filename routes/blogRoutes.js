@@ -8,6 +8,17 @@ const router = express.Router();
 
 const slugify = require("slugify");
 
+// GET all blogs
+router.get("/", authMiddleware, async (req, res) => {
+  try {
+    const blogs = await Blog.find();
+    res.json(blogs);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+
 // CREATE a blog (Admin only)
 router.post("/", authMiddleware, adminMiddleware, upload.single("image"), async (req, res) => {
   try {

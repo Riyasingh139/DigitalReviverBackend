@@ -22,7 +22,7 @@ router.post("/", authMiddleware, adminMiddleware, upload.single("image"), async 
 
     await newService.save();
     res.status(201).json({ message: "Service created successfully", service: newService });
-
+ 
   } catch (error) {
     res.status(500).json({ error: error.message || "Failed to create service" });
   }
