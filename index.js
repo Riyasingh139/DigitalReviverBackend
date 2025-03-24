@@ -7,6 +7,7 @@ const adminRoutes = require("./routes/adminRoutes");
 const popupRoutes = require("./routes/popupRoutes");
 const blogRoutes = require("./routes/blogRoutes");
 const serviceRoutes = require("./routes/serviceRoutes")
+const authRoutes = require("./routes/authRoutes");
 
 const app = express();
 const PORT = process.env.PORT || 8000;
@@ -23,8 +24,9 @@ if (!fs.existsSync(uploadDir)) {
 
 // Middleware
 app.use(express.json());
-app.use(cors({ origin: "http://localhost:3000" }));
+app.use(cors());
 app.use("/uploads", express.static("uploads")); // Serve images statically
+app.use(express.urlencoded({ extended: true }));
 
 
 // Connect to MongoDB
@@ -37,6 +39,7 @@ app.use("/admin", adminRoutes);
 app.use("/popup", popupRoutes);
 app.use("/api/blogs",blogRoutes)
 app.use("/api/services",serviceRoutes)
+app.use("/api/auth", authRoutes);
 
 
 // // Serve static files from React build

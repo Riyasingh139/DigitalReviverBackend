@@ -41,7 +41,7 @@ router.post("/login", async (req, res) => {
     const isMatch = await bcrypt.compare(password, admin.password);
     if (!isMatch) return res.status(400).json({ error: "Invalid credentials" });
 
-    const token = jwt.sign({ id: admin._id }, process.env.JWT_SECRET, { expiresIn: "7d" });
+    const token = jwt.sign({ id: admin._id , role: user.role}, process.env.JWT_SECRET, { expiresIn: "7d" });
 
     res.status(200).json({ message: "Login successful", token });
   } catch (error) {
@@ -49,8 +49,8 @@ router.post("/login", async (req, res) => {
   }
 });
 
-router.get("/check", authMiddleware, (req, res) => {
-  res.json({ isAdmin: req.admin.role === "admin" });
+router.get("/admin/check", authMiddleware, (req, res) => {
+  res.json({ isAdmin: req.user.role === "admin" });
 });
 
 module.exports = router;
