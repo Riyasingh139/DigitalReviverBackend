@@ -36,22 +36,31 @@ router.post("/login", async (req, res) => {
     }
 
     const admin = await Admin.findOne({ username });
-    if (!admin) return res.status(400).json({ error: "Invalid credentials" });
+    if (!admin) {
+      console.error("Admin not found:", username);
+      return res.status(400).json({ error: "Invalid credentials" });
+    }
 
     const isMatch = await bcrypt.compare(password, admin.password);
-    if (!isMatch) return res.status(400).json({ error: "Invalid credentials" });
+    if (!isMatch) {
+      console.error("Password does not match for:", username);
+      return res.status(400).json({ error: "Invalid credentials" });
+    }
 
-    const token = jwt.sign({ id: admin._id , role: user.role}, process.env.JWT_SECRET, { expiresIn: "7d" });
+    // JWT Token Generation (Fixed)
+    const token = jwt.sign({ id: admin._id, role: admin.role }, process.env.JWT_SECRET, { expiresIn: "7d" });
 
     res.status(200).json({ message: "Login successful", token });
   } catch (error) {
+    console.error("Login Error:", error.message);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
-router.get("/check", authMiddleware, adminMiddleware, (req, res) => {
-  res.status(200).json({ isAdmin: true });
-});
+
+// router.get("/check", authMiddleware, adminMiddleware, (req, res) => {
+//   res.status(200).json({ isAdmin: true });
+// });
 
 
 module.exports = router;
