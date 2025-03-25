@@ -8,6 +8,7 @@ const router = express.Router();
 
 // Submit Popup Form
 router.post("/", async (req, res) => {
+  console.log("Received POST request on /admin/popups"); // Debugging
   try {
     const { name, email, phone, message } = req.body;
     if (!name || !email || !phone || !message) {

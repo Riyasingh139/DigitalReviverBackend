@@ -29,7 +29,7 @@ const corsOptions = {
 
 // Middleware
 app.use(express.json());
-app.use(cors());
+// app.use(cors());
 app.use(cors(corsOptions)); // Apply CORS once
 app.use("/uploads", express.static("uploads")); // Serve images statically
 app.use(express.urlencoded({ extended: true }));
@@ -47,12 +47,26 @@ app.use("/api/blogs",blogRoutes)
 app.use("/api/services",serviceRoutes)
 app.use("/api/auth", authRoutes);
 
-app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "http://localhost:3000");
-  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE");
-  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  next();
-});
+
+
+const allowedOrigins = [
+  "http://localhost:3000", // Local development
+  "https://digitalreviver.com", // Live website
+  "https://www.digitalreviver.com", // Live 'www' version
+];
+
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    credentials: true, // Allow cookies/token headers
+  })
+);
 // app.use(cors({ origin: "*" }));
 
 // // Serve static files from React build
