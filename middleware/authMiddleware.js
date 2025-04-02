@@ -1,11 +1,14 @@
 const jwt = require("jsonwebtoken");
 
 const authMiddleware = (req, res, next) => {
-  const authHeader = req.headers.authorization;
+  const authHeader = req.headers.authorization?.trim();
   console.log("Auth Header:", authHeader); // Debugging
-
+  console.log("\n=====================");
+  console.log("🔹 Incoming Request to:", req.method, req.originalUrl);
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    
     console.error("Unauthorized: No token provided");
+
     return res.status(401).json({ error: "Unauthorized: No token provided" });
   }
 
@@ -30,7 +33,7 @@ const adminMiddleware = (req, res, next) => {
   console.log("User Data:", req.user); // Debugging
 
   if (!req.user || req.user.role !== "admin") {
-    console.error("Forbidden: Admin access only");
+    console.log("Admin Middleware Rejected:", req.user); // Debug why access is denied
     return res.status(403).json({ error: "Forbidden: Admin access only" });
   }
   next();

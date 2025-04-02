@@ -1,80 +1,147 @@
 const express = require("express");
 const Blog = require("../models/Blog");
-const upload = require("../middleware/upload"); 
-const { authMiddleware, adminMiddleware } = require("../middleware/authMiddleware");
+const upload = require("../middleware/upload");
+const {
+  authMiddleware,
+  adminMiddleware,
+} = require("../middleware/authMiddleware");
+const slugify = require("slugify");
 
 const router = express.Router();
 
-
-const slugify = require("slugify");
-
-// GET all blogs
+// 🔹 GET all blogs (Public)
 router.get("/", authMiddleware, async (req, res) => {
   try {
     const blogs = await Blog.find();
     res.json(blogs);
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: "Server error", error: err.message });
   }
 });
 
+// GET a blog by slug
+router.get("/:slug", async (req, res) => {
+  console.log("Incoming request for blog:", req.params.slug); // Debugging log
 
-// CREATE a blog (Admin only)
-router.post("/", authMiddleware, adminMiddleware, upload.single("image"), async (req, res) => {
   try {
-    let { title, content, slug, category } = req.body;
+    const blog = await Blog.findOne({ slug: req.params.slug });
 
-    if (!title || !content || !category) {
-      return res.status(400).json({ error: "Title, content, and category are required" });
+    if (!blog) {
+      console.log("No blog found in MongoDB!");
+      return res.status(404).json({ message: "Blog not found" });
     }
 
-    slug = slug ? slugify(slug, { lower: true, strict: true }) : slugify(title, { lower: true, strict: true });
-
-    const imagePath = req.file ? req.file.path : null;
-    const newBlog = new Blog({ title, content, slug, category, image: imagePath });
-
-    await newBlog.save();
-    res.status(201).json({ message: "Blog created successfully", blog: newBlog });
-
+    console.log("Blog found:", blog);
+    res.json(blog);
   } catch (error) {
-    res.status(500).json({ error: error.message || "Failed to create blog" });
+    console.error("Error querying MongoDB:", error);
+    res.status(500).json({ message: "Server error" });
   }
 });
 
-// UPDATE a blog (Admin only)
-router.put("/:slug", authMiddleware, adminMiddleware, upload.single("image"), async (req, res) => {
-  try {
-    const { title, content, category } = req.body;
+// 🔹 CREATE a blog (Admin only)
+router.post(
+  "/",
+  authMiddleware,
+  adminMiddleware,
+  upload.single("image"),
+  async (req, res) => {
+    try {
+      let { title, content, category, slug } = req.body;
+      if (!title || !content || !category) {
+        console.log("Received Data:", req.body);
+        console.log("Received File:", req.file); // Check if multer is working
+        return res
+          .status(400)
+          .json({ error: "Title, content, and category are required" });
+      }
 
-    if (!title || !content || !category) {
-      return res.status(400).json({ error: "Title, content, and category are required" });
+      // Generate slug from title if not provided
+      let originalSlug = slug
+        ? slugify(slug, { lower: true, strict: true })
+        : slugify(title, { lower: true, strict: true });
+      let finalSlug = originalSlug;
+      let count = 1;
+
+      while (await Blog.findOne({ slug: finalSlug })) {
+        finalSlug = `${originalSlug}-${count}`;
+        count++;
+      }
+
+      slug = finalSlug;
+
+      const imagePath = req.file ? req.file.path : null;
+      const newBlog = new Blog({
+        title,
+        content,
+        slug,
+        category,
+        image: imagePath,
+      });
+
+      await newBlog.save();
+      res
+        .status(201)
+        .json({ message: "Blog created successfully", blog: newBlog });
+    } catch (error) {
+      res
+        .status(500)
+        .json({ error: "Failed to create blog", message: error.message });
     }
-
-    const imagePath = req.file ? req.file.path : req.body.image;
-
-    const updatedBlog = await Blog.findOneAndUpdate(
-      { slug: req.params.slug },
-      { title, content, category, image: imagePath },
-      { new: true }
-    );
-
-    if (!updatedBlog) return res.status(404).json({ error: "Blog not found" });
-
-    res.status(200).json({ message: "Blog updated successfully", blog: updatedBlog });
-  } catch (error) {
-    res.status(500).json({ error: error.message || "Failed to update blog" });
   }
-});
+);
 
-// DELETE a blog (Admin only)
+// 🔹 UPDATE a blog (Admin only)
+router.put(
+  "/:slug",
+  authMiddleware,
+  adminMiddleware,
+  upload.single("image"),
+  async (req, res) => {
+    try {
+      const { title, content, category } = req.body;
+      if (!title || !content || !category) {
+        return res
+          .status(400)
+          .json({ error: "Title, content, and category are required" });
+      }
+
+      let blog = await Blog.findOne({ slug: req.params.slug });
+      if (!blog) return res.status(404).json({ error: "Blog not found" });
+
+      // Keep the old image if no new one is uploaded
+      const imagePath = req.file ? req.file.path : blog.image;
+
+      blog.title = title;
+      blog.content = content;
+      blog.category = category;
+      blog.image = imagePath;
+
+      await blog.save();
+      res.status(200).json({ message: "Blog updated successfully", blog });
+    } catch (error) {
+      res
+        .status(500)
+        .json({ error: "Failed to update blog", message: error.message });
+    }
+  }
+);
+
+// 🔹 DELETE a blog (Admin only)
 router.delete("/:slug", authMiddleware, adminMiddleware, async (req, res) => {
-  try {
-    const deletedBlog = await Blog.findOneAndDelete({ slug: req.params.slug });
-    if (!deletedBlog) return res.status(404).json({ error: "Blog not found" });
+  const { slug } = req.params;
 
-    res.status(200).json({ message: "Blog deleted successfully" });
+  try {
+    const deletedBlog = await PreviewBlog.findOneAndDelete({ slug });
+
+    if (!deletedBlog) {
+      return res.status(404).json({ message: "Blog not found" });
+    }
+
+    res.json({ message: "Blog deleted successfully" });
   } catch (error) {
-    res.status(500).json({ error: error.message || "Failed to delete blog" });
+    console.error("Error deleting blog:", error);
+    res.status(500).json({ error: "Server error deleting blog" });
   }
 });
 
