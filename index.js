@@ -23,27 +23,29 @@ if (!fs.existsSync(uploadDir)) {
 }
 
 // Allowed origins for CORS
-const allowedOrigins = [
-  "http://localhost:3000", // Local development
-  "https://digitalreviver.com", // Live website
-  "https://www.digitalreviver.com", // Live 'www' version
-];
+// const allowedOrigins = [
+//   "http://localhost:3000", // Local development
+//   "https://digitalreviverbackend-hhv2.onrender.com",
+//   "https://digitalreviver.com", // Live website
+//   "https://www.digitalreviver.com", // Live 'www' version
+  
+// ];
 
-// CORS Middleware (Applied Only Once)
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error("Not allowed by CORS"));
-      }
-    },
-    credentials: true, // Allow cookies/token headers
-  })
-);
+// // CORS Middleware (Applied Only Once)
+// app.use(
+//   cors({
+//     origin: function (origin, callback) {
+//       if (!origin || allowedOrigins.includes(origin)) {
+//         callback(null, true);
+//       } else {
+//         callback(new Error("Not allowed by CORS"));
+//       }
+//     },
+//     credentials: true, // Allow cookies/token headers
+//   })
+// );
 
-
+app.use(cors());
 
 // Middleware
 app.use(express.json({ limit: "50mb" }));
