@@ -10,7 +10,7 @@ const slugify = require("slugify");
 const router = express.Router();
 
 // 🔹 GET all blogs (Public)
-router.get("/", authMiddleware, async (req, res) => {
+router.get("/",  async (req, res) => {
   try {
     const blogs = await Blog.find();
     res.json(blogs);
