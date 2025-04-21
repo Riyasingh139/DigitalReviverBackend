@@ -155,15 +155,18 @@ router.post("/publish/:slug", authMiddleware, adminMiddleware, async (req, res) 
   try {
     const { slug } = req.params;
 
+    // Check if the user is an admin
     if (!req.user || req.user.role !== "admin") {
       return res.status(403).json({ error: "Unauthorized: Admin access required" });
     }
 
+    // Find the preview blog by slug
     const previewBlog = await PreviewBlog.findOne({ slug });
     if (!previewBlog) {
       return res.status(404).json({ error: "Preview blog not found" });
     }
 
+    // Check if the blog already exists in the main Blog collection
     const existingBlog = await Blog.findOne({ slug });
 
     const blogData = {
@@ -179,6 +182,7 @@ router.post("/publish/:slug", authMiddleware, adminMiddleware, async (req, res) 
       updatedAt: new Date(),
     };
 
+    // If the blog exists, update it, else create a new one
     if (existingBlog) {
       await Blog.updateOne({ slug }, { $set: blogData });
     } else {
@@ -186,10 +190,8 @@ router.post("/publish/:slug", authMiddleware, adminMiddleware, async (req, res) 
       await newBlog.save();
     }
 
-    // ✅ Delete from PreviewBlog after publishing
-    await PreviewBlog.deleteOne({ slug });
-
-    res.status(200).json({ message: "Blog published and preview removed successfully" });
+    // Do not delete the preview blog after publishing
+    res.status(200).json({ message: "Blog published successfully" });
   } catch (error) {
     console.error("Error publishing blog:", error);
     res.status(500).json({ error: "Server error" });
