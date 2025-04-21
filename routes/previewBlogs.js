@@ -45,42 +45,62 @@ router.get("/:slug", authMiddleware, adminMiddleware, async (req, res) => {
 
 
 // Update an existing preview blog (this was missing)
-
 router.post("/", authMiddleware, adminMiddleware, upload.single("image"), async (req, res) => {
   try {
-    const { title, content, category, slug } = req.body;
+    const {
+      title,
+      content,
+      category,
+      metaTitle,
+      metaDescription,
+      focusKeyword,
+      slug,
+    } = req.body;
 
+    // Validation
     if (!title || !content || !category) {
       console.log("Received Data:", req.body);
-      console.log("Received File:", req.file); // Check if multer is working
-      return res.status(400).json({ error: "Title, content, and category are required" });
+      console.log("Received File:", req.file);
+      return res.status(400).json({
+        error: "Title, content, and category are required",
+      });
     }
 
-    // Generate a unique slug
+    // Slug generation
     let finalSlug = slug
       ? slugify(slug, { lower: true, strict: true })
       : slugify(title, { lower: true, strict: true });
 
+    // Ensure unique slug
     while (await PreviewBlog.findOne({ slug: finalSlug })) {
       finalSlug += `-${Math.floor(Math.random() * 1000)}`;
     }
 
+    // Handle image upload
     const imagePath = req.file ? req.file.path : null;
 
-    // Save the blog in previewblogs collection
+    // Create new blog post
     const newBlog = new PreviewBlog({
       title,
       content,
-      slug: finalSlug,
       category,
+      slug: finalSlug,
       image: imagePath,
+      metaTitle: metaTitle || "",
+      metaDescription: metaDescription || "",
+      focusKeyword: focusKeyword || "",
       createdAt: new Date(),
     });
 
     await newBlog.save();
-    res.status(201).json({ message: "Blog saved successfully", previewblogs: newBlog });
+
+    res.status(201).json({
+      message: "Blog saved successfully",
+      previewblogs: newBlog, // Send the saved blog object back in the response
+    });
 
   } catch (error) {
+    console.error("Error saving blog:", error);
     res.status(500).json({ error: "Failed to save blog" });
   }
 });
@@ -88,96 +108,88 @@ router.post("/", authMiddleware, adminMiddleware, upload.single("image"), async 
 
 
 
+router.put("/:slug", authMiddleware, adminMiddleware, upload.single("image"), async (req, res) => {
+  console.log("PUT request received for:", req.params.slug);
 
+  try {
+    const previewBlog = await PreviewBlog.findOne({ slug: req.params.slug });
 
-router.put("/:slug", authMiddleware, adminMiddleware, async (req, res) => {
-    console.log("PUT request received for:", req.params.slug); // Debug log
-  
-    try {
-      const previewBlog = await PreviewBlog.findOne({ slug: req.params.slug });
-      if (!previewBlog) {
-        console.log("No blog found for slug:", req.params.slug);
-        return res.status(404).json({ error: "Preview blog not found" });
-      }
-  
-      previewBlog.title = req.body.title || previewBlog.title;
-      previewBlog.content = req.body.content || previewBlog.content;
-      previewBlog.category = req.body.category || previewBlog.category;
-  
-      await previewBlog.save();
-      res.status(200).json({ message: "Blog updated successfully", blogs: previewBlog });
-  
-    } catch (error) {
-      console.error("Error updating blog:", error);
-      res.status(500).json({ error: "Failed to update preview blog", message: error.message });
+    if (!previewBlog) {
+      console.log("No blog found for slug:", req.params.slug);
+      return res.status(404).json({ error: "Preview blog not found" });
     }
-  });
-  
 
-// router.post("/publish/:slug", authMiddleware, adminMiddleware, async (req, res) => {
-//   try {
-//     const { slug } = req.params;
-//     const previewBlog = await PreviewBlog.findOne({ slug });
+    const { title, content, category, image, metaTitle, metaDescription, focusKeyword } = req.body;
 
-//     if (!previewBlog) {
-//       return res.status(404).json({ error: "Blog not found in preview" });
-//     }
+    // Update fields
+    previewBlog.title = title || previewBlog.title;
+    previewBlog.content = content || previewBlog.content;
+    previewBlog.category = category || previewBlog.category;
+    previewBlog.metaTitle = metaTitle || previewBlog.metaTitle;
+    previewBlog.metaDescription = metaDescription || previewBlog.metaDescription;
+    previewBlog.focusKeyword = focusKeyword || previewBlog.focusKeyword;
 
-//     // Check if blog already exists in `blogs`
-//     const existingBlog = await Blog.findOne({ slug });
-//     if (existingBlog) {
-//       return res.status(400).json({ error: "Blog already published" });
-//     }
+    // Handle image update
+    if (req.file) {
+      if (previewBlog.image && previewBlog.image.startsWith("uploads/")) {
+        const oldImagePath = path.join(__dirname, "..", previewBlog.image);
+        fs.unlink(oldImagePath, (err) => {
+          if (err) console.warn("⚠️ Failed to delete old image:", err);
+        });
+      }
+      previewBlog.image = req.file.path;
+    }
+    if (image && typeof image === "string") {
+      previewBlog.image = image;
+    }
+    await previewBlog.save();
 
-//     // Copy the blog to `blogs` without removing from `previewblogs`
-//     const publishedBlog = new Blog({
-//       title: previewBlog.title,
-//       content: previewBlog.content,
-//       slug: previewBlog.slug,
-//       category: previewBlog.category,
-//       image: previewBlog.image,
-//       createdAt: previewBlog.createdAt,
-//     });
+    res.status(200).json({ message: "Blog updated successfully", blog: previewBlog });
+  } catch (error) {
+    console.error("Error updating blog:", error);
+    res.status(500).json({ error: "Failed to update preview blog", message: error.message });
+  }
+});
 
-//     await publishedBlog.save();
-
-//     res.status(201).json({ message: "Blog published successfully", blog: publishedBlog });
-//   } catch (error) {
-//     console.error("Error publishing blog:", error);
-//     res.status(500).json({ error: "Failed to publish blog" });
-//   }
-// });
-router.post("/publish/:slug", authMiddleware , adminMiddleware , async (req, res) => {
+router.post("/publish/:slug", authMiddleware, adminMiddleware, async (req, res) => {
   try {
     const { slug } = req.params;
-    const updatedBlog = req.body;
 
-    console.log("User making request:", req.user);
-
-    // Ensure only authorized users can publish
     if (!req.user || req.user.role !== "admin") {
       return res.status(403).json({ error: "Unauthorized: Admin access required" });
     }
 
     const previewBlog = await PreviewBlog.findOne({ slug });
     if (!previewBlog) {
-      return res.status(404).json({ error: "Blog not found in preview" });
+      return res.status(404).json({ error: "Preview blog not found" });
     }
 
-    let existingBlog = await Blog.findOne({ slug });
+    const existingBlog = await Blog.findOne({ slug });
+
+    const blogData = {
+      title: previewBlog.title,
+      content: previewBlog.content,
+      slug: previewBlog.slug,
+      category: previewBlog.category,
+      image: previewBlog.image || "",
+      metaTitle: previewBlog.metaTitle || "",
+      metaDescription: previewBlog.metaDescription || "",
+      focusKeyword: previewBlog.focusKeyword || "",
+      createdAt: previewBlog.createdAt || new Date(),
+      updatedAt: new Date(),
+    };
 
     if (existingBlog) {
-      // Update the published blog
-      await Blog.updateOne({ slug }, { $set: updatedBlog });
-      return res.status(200).json({ message: "Blog updated successfully" });
+      await Blog.updateOne({ slug }, { $set: blogData });
+    } else {
+      const newBlog = new Blog(blogData);
+      await newBlog.save();
     }
 
-    // Publish new blog
-    const newPublishedBlog = new Blog(previewBlog.toObject());
-    await newPublishedBlog.save();
-    // await PreviewBlog.deleteOne({ slug });
+    // ✅ Delete from PreviewBlog after publishing
+    await PreviewBlog.deleteOne({ slug });
 
-    res.status(200).json({ message: "Blog published successfully" });
+    res.status(200).json({ message: "Blog published and preview removed successfully" });
   } catch (error) {
     console.error("Error publishing blog:", error);
     res.status(500).json({ error: "Server error" });
@@ -185,28 +197,83 @@ router.post("/publish/:slug", authMiddleware , adminMiddleware , async (req, res
 });
 
 
+
 router.delete("/:slug", async (req, res) => {
   try {
     const { slug } = req.params;
-    console.log("Deleting from previewblogs and blogs, slug:", slug);
 
-    // Delete from previewblogs collection
-    const deletedPreviewBlog = await PreviewBlog.findOneAndDelete({ slug });
+    // Find the preview blog and the main blog
+    const previewBlog = await PreviewBlog.findOne({ slug });
+    const blog = await Blog.findOne({ slug });
 
-    // Delete from blogs collection
-    const deletedBlog = await Blog.findOneAndDelete({ slug });
-
-    // If neither exists, return an error
-    if (!deletedPreviewBlog && !deletedBlog) {
-      return res.status(404).json({ error: "Blog not found in either collection" });
+    // Check if either previewBlog or blog exists
+    if (!previewBlog && !blog) {
+      return res.status(404).json({ error: "Blog not found" });
     }
 
-    res.json({ message: "Blog deleted successfully from both collections" });
-  } catch (error) {
-    console.error("❌ Server error deleting blog:", error);
-    res.status(500).json({ error: "Server error deleting blog" });
+    // Get the image URL to delete (either from previewBlog or blog)
+    let imageUrl = previewBlog?.image || blog?.image;
+
+    if (!imageUrl) {
+      return res.status(404).json({ error: "No image found to delete" });
+    }
+
+    // Extract public ID from the image URL (assuming it is hosted on Cloudinary)
+    const urlParts = imageUrl.split("/");
+    const folderIndex = urlParts.findIndex(part => part === "uploads") + 1;
+    const publicIdWithExt = urlParts.slice(folderIndex).join("/");
+    const publicId = publicIdWithExt.split(".")[0]; // Get the public ID (excluding the extension)
+
+    // Delete the image from Cloudinary
+    const result = await cloudinary.uploader.destroy(publicId);
+    console.log("Cloudinary delete result:", result);
+
+    // Update PreviewBlog collection (clear the image field)
+    if (previewBlog) {
+      previewBlog.image = null;
+      await previewBlog.save();
+      console.log("PreviewBlog image removed:", previewBlog.image);
+    }
+
+    // Update Blog collection (clear the image field)
+    if (blog) {
+      blog.image = null;
+      await blog.save();
+      console.log("Blog image removed:", blog.image);
+    }
+
+    // Respond with success message
+    return res.json({ message: "Image deleted from Cloudinary and database updated" });
+
+  } catch (err) {
+    console.error("Error in delete image route:", err);
+    return res.status(500).json({ error: "Internal server error" });
   }
 });
 
+// Add a new route for handling image uploads
+router.post('/upload', upload.single('image'), async (req, res) => {
+  try {
+    const streamUpload = (req) => {
+      return new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream((error, result) => {
+          if (result) {
+            resolve(result);
+          } else {
+            reject(error);
+          }
+        });
+
+        streamifier.createReadStream(req.file.buffer).pipe(stream);
+      });
+    };
+
+    const result = await streamUpload(req);
+    res.status(200).json({ imageUrl: result.secure_url });
+  } catch (err) {
+    console.error('Upload error:', err);
+    res.status(500).json({ error: 'Image upload failed' });
+  }
+});
 
 module.exports = router;

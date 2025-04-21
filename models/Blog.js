@@ -1,16 +1,52 @@
-const mongoose = require("mongoose");
+// Import mongoose
+const mongoose = require('mongoose');
 
-const BlogSchema = new mongoose.Schema(
-  {
-    title: { type: String, required: true },
-    slug: { type: String, unique: true, required: true },
-    content: { type: String, required: true },
-    category: { type: String, required: true },
-    image: { type: String }, // URL of the uploaded image
-    date: { type: Date, default: Date.now },
+// Define the blog schema
+const blogSchema = new mongoose.Schema({
+  title: {
+    type: String,
+    required: true,
   },
-  { timestamps: true }
-);
+  content: {
+    type: String,
+    required: true,
+  },
+  category: {
+    type: String,
+    required: true,
+  },
+  metaTitle: {
+    type: String,
+    default: '', // Optional, can be left empty if not provided
+  },
+  metaDescription: {
+    type: String,
+    default: '', // Optional
+  },
+  focusKeyword: {
+    type: String,
+    default: '', // Optional
+  },
+  slug: {
+    type: String,
+    required: true,
+    unique: true,
+  },
+  image: {
+    type: String,
+    default: null, // Optional, image URL or path
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now,
+  },
+  updatedAt: {
+    type: Date,
+    default: Date.now,
+  },
+});
 
+// Create and export the model based on the schema
+const Blog = mongoose.model('Blog', blogSchema);
 
-module.exports = mongoose.model("Blog", BlogSchema);
+module.exports = Blog;

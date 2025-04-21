@@ -6,6 +6,15 @@ const PreviewBlogSchema = new mongoose.Schema({
   slug: { type: String, unique: true, required: true },
   category: { type: String, required: true },
   image: { type: String },
+  metaTitle: {
+    type: String,
+  },
+  metaDescription: {
+    type: String,
+  },
+  focusKeyword: {
+    type: String,
+  },
   createdAt: { type: Date, default: Date.now },
 });
 

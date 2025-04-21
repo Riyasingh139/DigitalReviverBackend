@@ -1,17 +1,16 @@
 const express = require("express");
-const PreviewService = require("../models/PreviewService"); // Ensure correct model
+const PreviewService = require("../models/PreviewService");
+const Service = require("../models/Service");
 const upload = require("../middleware/upload");
 const { authMiddleware, adminMiddleware } = require("../middleware/authMiddleware");
 const slugify = require("slugify");
-const Service = require("../models/Service");
 
 const router = express.Router();
 
-// Fetch all preview services (Only for Admin Dashboard)
+// 🔹 Get all preview services (Admin only)
 router.get("/", authMiddleware, adminMiddleware, async (req, res) => {
   try {
-    console.log("\n=== FETCHING PREVIEW SERVICES ===");
-    const services = await PreviewService.find().sort({ createdAt: -1 }); // FIXED Model Reference
+    const services = await PreviewService.find().sort({ createdAt: -1 });
     res.json(services);
   } catch (error) {
     console.error("Error fetching preview services:", error);
@@ -19,138 +18,138 @@ router.get("/", authMiddleware, adminMiddleware, async (req, res) => {
   }
 });
 
-// Fetch a single preview service by slug
+// 🔹 Get a single preview service by slug
 router.get("/:slug", authMiddleware, adminMiddleware, async (req, res) => {
-  const { slug } = req.params;
-  console.log("🔍 Searching for slug:", slug);
-
   try {
-    const service = await PreviewService.findOne({ slug: req.params.slug }); // FIXED Model Reference
-
-    if (!service) {
-      return res.status(404).json({ message: "Service not found" });
-    }
-
+    const service = await PreviewService.findOne({ slug: req.params.slug });
+    if (!service) return res.status(404).json({ message: "Preview service not found" });
     res.json(service);
   } catch (error) {
     console.error("Error fetching service:", error);
-    res.status(500).json({ error: "Server error fetching service" });
+    res.status(500).json({ error: "Server error fetching preview service" });
   }
 });
 
-// Save a service as a draft (Preview)
+// 🔹 Save a new preview service
 router.post("/", authMiddleware, adminMiddleware, upload.single("image"), async (req, res) => {
   try {
-    console.log("Request Body:", req.body);
-    console.log("Uploaded File:", req.file);
+    let { title, description, category, metaTitle, metaDescription, focusKeyword, slug } = req.body;
 
-    const { title, description, category, slug } = req.body;
     if (!title || !description || !category) {
       return res.status(400).json({ error: "Title, description, and category are required" });
     }
 
-    let finalSlug = slug
-      ? slugify(slug, { lower: true, strict: true })
-      : slugify(title, { lower: true, strict: true });
-
-    while (await PreviewService.findOne({ slug: finalSlug })) { // FIXED Model Reference
-      finalSlug += `-${Math.floor(Math.random() * 1000)}`;
+    let baseSlug = slug ? slugify(slug, { lower: true, strict: true }) : slugify(title, { lower: true, strict: true });
+    let finalSlug = baseSlug;
+    let count = 1;
+    while (await PreviewService.findOne({ slug: finalSlug })) {
+      finalSlug = `${baseSlug}-${count++}`;
     }
 
     const imagePath = req.file ? req.file.path : null;
 
-    const newService = new PreviewService({  // FIXED Model Reference
+    const newService = new PreviewService({
       title,
       description,
       slug: finalSlug,
       category,
+      metaTitle: metaTitle || title,
+      metaDescription: metaDescription || description,
+      focusKeyword: focusKeyword || "default, keywords",
       image: imagePath,
-      createdAt: new Date(),
     });
 
     await newService.save();
-    res.status(201).json({ message: "Service saved successfully", previewService: newService });
+    res.status(201).json({ message: "Preview service saved", previewService: newService });
 
   } catch (error) {
-    console.error("Error saving service:", error);
-    res.status(500).json({ error: "Failed to save service" });
+    console.error("Error saving preview service:", error);
+    res.status(500).json({ error: "Failed to save preview service" });
   }
 });
 
-// Update an existing preview service
-router.put("/:slug", authMiddleware, adminMiddleware, async (req, res) => {
-  console.log("PUT request received for:", req.params.slug);
-
+// 🔹 Update preview service
+router.put("/:slug", authMiddleware, adminMiddleware, upload.single("image"), async (req, res) => {
   try {
-    const previewService = await PreviewService.findOne({ slug: req.params.slug }); // FIXED Model Reference
-    if (!previewService) {
-      return res.status(404).json({ error: "Preview service not found" });
-    }
+    const previewService = await PreviewService.findOne({ slug: req.params.slug });
+    if (!previewService) return res.status(404).json({ error: "Preview service not found" });
 
     previewService.title = req.body.title || previewService.title;
     previewService.description = req.body.description || previewService.description;
     previewService.category = req.body.category || previewService.category;
+    previewService.metaTitle = req.body.metaTitle || previewService.metaTitle;
+    previewService.metaDescription = req.body.metaDescription || previewService.metaDescription;
+    previewService.focusKeyword = req.body.focusKeyword || previewService.focusKeyword;
+    if (req.file) previewService.image = req.file.path;
 
     await previewService.save();
-    res.status(200).json({ message: "Service updated successfully", service: previewService });
+    res.status(200).json({ message: "Preview service updated", service: previewService });
 
   } catch (error) {
-    console.error("Error updating service:", error);
-    res.status(500).json({ error: "Failed to update preview service", message: error.message });
+    console.error("Error updating preview service:", error);
+    res.status(500).json({ error: "Failed to update preview service" });
   }
 });
 
-// Publish a preview service
-router.post("/publish/:slug", authMiddleware, adminMiddleware, async (req, res) => {
+router.post("/publish/:slug", authMiddleware, adminMiddleware, upload.single("image"), async (req, res) => {
+  console.log("---- PUBLISHING SERVICE ----");
+  console.log("Request Body:", req.body);
+  console.log("Uploaded File:", req.file);
   try {
     const { slug } = req.params;
-    const updatedService = req.body;
+    const previewService = await PreviewService.findOne({ slug });
 
-    console.log("User making request:", req.user);
-
-    if (!req.user || req.user.role !== "admin") {
-      return res.status(403).json({ error: "Unauthorized: Admin access required" });
-    }
-
-    const previewService = await PreviewService.findOne({ slug: req.params.slug  }); // FIXED Model Reference
     if (!previewService) {
-      return res.status(404).json({ error: "Service not found in preview" });
+      return res.status(404).json({ error: "Preview service not found" });
     }
 
-    let existingService = await Service.findOne({ slug });
+    // Clone preview data
+    const previewData = previewService.toObject();
+   
+    
+    // Override fields if provided in formData (especially SEO metadata)
+    if (req.body.metaTitle) previewData.metaTitle = req.body.metaTitle;
+    if (req.body.metaDescription) previewData.metaDescription = req.body.metaDescription;
+    if (req.body.focusKeyword) previewData.focusKeyword = req.body.focusKeyword;
 
-    if (existingService) {
-      await Service.updateOne({ slug }, { $set: updatedService });
-      return res.status(200).json({ message: "Service updated successfully" });
+    // Handle image if uploaded
+    if (req.file) {
+      previewData.image = req.file.path; // Or req.file.filename depending on how you store it
     }
 
-    const newPublishedService = new Service(previewService.toObject());
-    await newPublishedService.save();
+    const existing = await Service.findOne({ slug });
 
+    if (existing) {
+      await Service.updateOne({ slug }, { $set: previewData });
+      return res.status(200).json({ message: "Service updated from preview" });
+    }
+
+    const published = new Service(previewData);
+    await published.save();
     res.status(200).json({ message: "Service published successfully" });
+
   } catch (error) {
     console.error("Error publishing service:", error);
-    res.status(500).json({ error: "Server error" });
+    res.status(500).json({ error: "Failed to publish service" });
   }
 });
 
-// Delete a preview service
-router.delete("/:slug", async (req, res) => {
+// 🔹 Delete preview + published service (if exists)
+router.delete("/:slug", authMiddleware, adminMiddleware, async (req, res) => {
   try {
     const { slug } = req.params;
-    console.log("Deleting from previewservices and services, slug:", slug);
 
-    const deletedPreviewService = await PreviewService.findOneAndDelete({ slug }); // FIXED Model Reference
-    const deletedService = await Service.findOneAndDelete({ slug });
+    const previewDeleted = await PreviewService.findOneAndDelete({ slug });
+    const serviceDeleted = await Service.findOneAndDelete({ slug });
 
-    if (!deletedPreviewService && !deletedService) {
+    if (!previewDeleted && !serviceDeleted) {
       return res.status(404).json({ error: "Service not found in either collection" });
     }
 
-    res.json({ message: "Service deleted successfully from both collections" });
+    res.json({ message: "Service deleted from both collections (if existed)" });
   } catch (error) {
-    console.error("❌ Server error deleting service:", error);
-    res.status(500).json({ error: "Server error deleting service" });
+    console.error("Error deleting service:", error);
+    res.status(500).json({ error: "Failed to delete service" });
   }
 });
 

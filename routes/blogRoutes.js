@@ -47,22 +47,37 @@ router.post(
   upload.single("image"),
   async (req, res) => {
     try {
-      let { title, content, category, slug } = req.body;
+      let {
+        title,
+        content,
+        category,
+        metaTitle,
+        metaDescription,
+        focusKeyword,
+        slug,
+      } = req.body;
+
+      // Ensure required fields are present
       if (!title || !content || !category) {
-        console.log("Received Data:", req.body);
-        console.log("Received File:", req.file); // Check if multer is working
         return res
           .status(400)
           .json({ error: "Title, content, and category are required" });
       }
 
-      // Generate slug from title if not provided
+      // Set default values for optional fields
+      metaTitle = metaTitle || title; // Use title if metaTitle is not provided
+      metaDescription = metaDescription || ""; // Default to empty string
+      focusKeyword = focusKeyword || ""; // Default to empty string
+
+      // Generate unique slug
       let originalSlug = slug
         ? slugify(slug, { lower: true, strict: true })
         : slugify(title, { lower: true, strict: true });
+
       let finalSlug = originalSlug;
       let count = 1;
 
+      // Ensure the slug is unique
       while (await Blog.findOne({ slug: finalSlug })) {
         finalSlug = `${originalSlug}-${count}`;
         count++;
@@ -70,23 +85,34 @@ router.post(
 
       slug = finalSlug;
 
+      // Handle image upload if present
       const imagePath = req.file ? req.file.path : null;
+
       const newBlog = new Blog({
         title,
         content,
         slug,
         category,
-        image: imagePath,
+        metaTitle,
+        metaDescription,
+        focusKeyword,
+        image: imagePath, // Save image path if image is uploaded
+        createdAt: new Date(), // Optional: adds timestamp
       });
 
+      // Save the new blog post
       await newBlog.save();
-      res
-        .status(201)
-        .json({ message: "Blog created successfully", blog: newBlog });
+
+      res.status(201).json({
+        message: "Blog created successfully",
+        blog: newBlog,
+      });
     } catch (error) {
-      res
-        .status(500)
-        .json({ error: "Failed to create blog", message: error.message });
+      console.error("Blog creation error:", error);
+      res.status(500).json({
+        error: "Failed to create blog",
+        message: error.message,
+      });
     }
   }
 );
