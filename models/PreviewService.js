@@ -1,25 +1,19 @@
-const mongoose = require('mongoose');
-const Schema = mongoose.Schema;
+const mongoose = require("mongoose");
 
-// Define the schema for a PreviewService
-const previewServiceSchema = new Schema(
-  {
-    title: String,
+const previewServiceSchema = new mongoose.Schema({
+  title: String,
   description: String,
   category: String,
-  slug: { type: String, unique: true },
-  metaTitle: String, // ✅ Must be here
+  image: String,
+  metaTitle: String,
   metaDescription: String,
   focusKeyword: String,
-  image: String,
-  createdAt: { type: Date, default: Date.now },
-  },
-  {
-    timestamps: true, // Automatically adds createdAt and updatedAt
+  slug: {
+    type: String,
+    required: true,
+    unique: true,
   }
-);
+  
+});
 
-// Create a model from the schema
-const PreviewService = mongoose.model('PreviewService', previewServiceSchema);
-
-module.exports = PreviewService;
+module.exports = mongoose.model("PreviewService", previewServiceSchema);

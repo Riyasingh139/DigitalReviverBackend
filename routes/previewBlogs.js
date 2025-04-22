@@ -4,7 +4,7 @@ const upload = require("../middleware/upload");
 const { authMiddleware, adminMiddleware } = require("../middleware/authMiddleware");
 const slugify = require("slugify");
 const Blog = require("../models/Blog");
-
+const cloudinary = require('cloudinary').v2;
 const router = express.Router();
 
 
@@ -112,42 +112,34 @@ router.put("/:slug", authMiddleware, adminMiddleware, upload.single("image"), as
   console.log("PUT request received for:", req.params.slug);
 
   try {
-    const previewBlog = await PreviewBlog.findOne({ slug: req.params.slug });
+    const { slug } = req.params;
+    const blog = await PreviewBlog.findOne({ slug });
 
-    if (!previewBlog) {
-      console.log("No blog found for slug:", req.params.slug);
-      return res.status(404).json({ error: "Preview blog not found" });
-    }
+    if (!blog) return res.status(404).json({ error: "Blog not found" });
 
-    const { title, content, category, image, metaTitle, metaDescription, focusKeyword } = req.body;
+    const {
+      title,
+      content,
+      category,
+      image,
+      metaTitle,
+      metaDescription,
+      focusKeyword,
+    } = req.body;
 
-    // Update fields
-    previewBlog.title = title || previewBlog.title;
-    previewBlog.content = content || previewBlog.content;
-    previewBlog.category = category || previewBlog.category;
-    previewBlog.metaTitle = metaTitle || previewBlog.metaTitle;
-    previewBlog.metaDescription = metaDescription || previewBlog.metaDescription;
-    previewBlog.focusKeyword = focusKeyword || previewBlog.focusKeyword;
+    blog.title = title;
+    blog.content = content;
+    blog.category = category;
+    blog.image = image;
+    blog.metaTitle = metaTitle;
+    blog.metaDescription = metaDescription;
+    blog.focusKeyword = focusKeyword;
 
-    // Handle image update
-    if (req.file) {
-      if (previewBlog.image && previewBlog.image.startsWith("uploads/")) {
-        const oldImagePath = path.join(__dirname, "..", previewBlog.image);
-        fs.unlink(oldImagePath, (err) => {
-          if (err) console.warn("⚠️ Failed to delete old image:", err);
-        });
-      }
-      previewBlog.image = req.file.path;
-    }
-    if (image && typeof image === "string") {
-      previewBlog.image = image;
-    }
-    await previewBlog.save();
-
-    res.status(200).json({ message: "Blog updated successfully", blog: previewBlog });
-  } catch (error) {
-    console.error("Error updating blog:", error);
-    res.status(500).json({ error: "Failed to update preview blog", message: error.message });
+    await blog.save();
+    res.status(200).json({ message: "Blog updated successfully" });
+  } catch (err) {
+    console.error("Update Blog Error:", err);
+    res.status(500).json({ error: "Failed to update blog" });
   }
 });
 
@@ -200,81 +192,59 @@ router.post("/publish/:slug", authMiddleware, adminMiddleware, async (req, res) 
 
 
 
+// DELETE full blog (image + document)
 router.delete("/:slug", async (req, res) => {
   try {
     const { slug } = req.params;
 
-    // Find the preview blog and the main blog
+    // Check both collections
     const previewBlog = await PreviewBlog.findOne({ slug });
     const blog = await Blog.findOne({ slug });
 
-    // Check if either previewBlog or blog exists
     if (!previewBlog && !blog) {
       return res.status(404).json({ error: "Blog not found" });
     }
 
-    // Get the image URL to delete (either from previewBlog or blog)
-    let imageUrl = previewBlog?.image || blog?.image;
+    // Get image URL
+    const imageUrl = previewBlog?.image || blog?.image;
+    if (imageUrl) {
+      const urlParts = imageUrl.split("/");
+      const publicIdWithExt = urlParts.slice(urlParts.findIndex(p => p === "uploads") + 1).join("/");
+      const publicId = publicIdWithExt.split(".")[0];
 
-    if (!imageUrl) {
-      return res.status(404).json({ error: "No image found to delete" });
+      const result = await cloudinary.uploader.destroy(publicId);
+      console.log("Cloudinary delete result:", result);
     }
 
-    // Extract public ID from the image URL (assuming it is hosted on Cloudinary)
-    const urlParts = imageUrl.split("/");
-    const folderIndex = urlParts.findIndex(part => part === "uploads") + 1;
-    const publicIdWithExt = urlParts.slice(folderIndex).join("/");
-    const publicId = publicIdWithExt.split(".")[0]; // Get the public ID (excluding the extension)
-
-    // Delete the image from Cloudinary
-    const result = await cloudinary.uploader.destroy(publicId);
-    console.log("Cloudinary delete result:", result);
-
-    // Update PreviewBlog collection (clear the image field)
+    // Delete the document
     if (previewBlog) {
-      previewBlog.image = null;
-      await previewBlog.save();
-      console.log("PreviewBlog image removed:", previewBlog.image);
+      await PreviewBlog.deleteOne({ slug });
+      console.log("PreviewBlog deleted");
+    } else if (blog) {
+      await Blog.deleteOne({ slug });
+      console.log("Published Blog deleted");
     }
 
-    // Update Blog collection (clear the image field)
-    if (blog) {
-      blog.image = null;
-      await blog.save();
-      console.log("Blog image removed:", blog.image);
-    }
-
-    // Respond with success message
-    return res.json({ message: "Image deleted from Cloudinary and database updated" });
-
+    return res.json({ message: "Blog and image deleted successfully" });
   } catch (err) {
-    console.error("Error in delete image route:", err);
+    console.error("Error in delete blog route:", err);
     return res.status(500).json({ error: "Internal server error" });
   }
 });
 
 // Add a new route for handling image uploads
-router.post('/upload', upload.single('image'), async (req, res) => {
+
+// ✅ Image upload route
+router.post("/upload", upload.single("image"), async (req, res) => {
   try {
-    const streamUpload = (req) => {
-      return new Promise((resolve, reject) => {
-        const stream = cloudinary.uploader.upload_stream((error, result) => {
-          if (result) {
-            resolve(result);
-          } else {
-            reject(error);
-          }
-        });
+    if (!req.file) {
+      return res.status(400).json({ error: "No image uploaded" });
+    }
 
-        streamifier.createReadStream(req.file.buffer).pipe(stream);
-      });
-    };
-
-    const result = await streamUpload(req);
-    res.status(200).json({ imageUrl: result.secure_url });
+    res.status(200).json({ imageUrl: req.file.path });
   } catch (err) {
-    console.error('Upload error:', err);
-    res.status(500).json({ error: 'Image upload failed' });
+    console.error("Image Upload Error:", err);
+    res.status(500).json({ error: "Image upload failed" });
   }
 });
 

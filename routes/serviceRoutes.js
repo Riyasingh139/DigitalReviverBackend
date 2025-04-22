@@ -33,45 +33,60 @@ router.get("/:slug", async (req, res) => {
 });
 
 // 🔹 CREATE a service (Admin only)
-router.post("/", authMiddleware, adminMiddleware, upload.single("image"), async (req, res) => {
-  try {
-    let { title, description, category, slug, metaTitle, metaDescription, focusKeyword } = req.body;
+router.post(
+  "/",
+  authMiddleware,
+  adminMiddleware,
+  upload.single("image"),
+  async (req, res) => {
+    try {
+      let { title, description, category, metaTitle, metaDescription, focusKeyword, slug } = req.body;
 
-    if (!title || !description || !category) {
-      return res.status(400).json({ error: "Title, description, and category are required" });
+      // Ensure required fields are present
+      if (!title || !description || !category) {
+        return res.status(400).json({ error: "Title, description, and category are required" });
+      }
+
+      // Generate unique slug
+      let originalSlug = slug ? slugify(slug, { lower: true, strict: true }) : slugify(title, { lower: true, strict: true });
+      let finalSlug = originalSlug;
+      let count = 1;
+
+      // Ensure the slug is unique
+      while (await PreviewService.findOne({ slug: finalSlug })) {
+        finalSlug = `${originalSlug}-${count}`;
+        count++;
+      }
+
+      slug = finalSlug;
+
+      // Handle image upload if present
+      const imagePath = req.file ? req.file.path : null;
+
+      const newPreviewService = new PreviewService({
+        title,
+        description,
+        category,
+        image: imagePath, // Save image path if image is uploaded
+        metaTitle,
+        metaDescription,
+        focusKeyword,
+        slug,
+      });
+
+      await newPreviewService.save();
+
+      res.status(201).json({
+        message: "Service created successfully",
+        service: newPreviewService,
+      });
+    } catch (error) {
+      console.error("Service creation error:", error);
+      res.status(500).json({ error: "Failed to create service", message: error.message });
     }
-
-    // Generate a unique slug
-    let originalSlug = slug ? slugify(slug, { lower: true, strict: true }) : slugify(title, { lower: true, strict: true });
-    let finalSlug = originalSlug;
-    let count = 1;
-
-    while (await Service.findOne({ slug: finalSlug })) {
-      finalSlug = `${originalSlug}-${count}`;
-      count++;
-    }
-    slug = finalSlug;
-
-    const imagePath = req.file ? req.file.path : null;
-
-    const newService = new Service({
-      title,
-      description,
-      category,
-      slug,
-      image: imagePath,
-      metaTitle,
-      metaDescription,
-      focusKeyword,
-    });
-
-    await newService.save();
-    res.status(201).json({ message: "Service created successfully", service: newService });
-
-  } catch (error) {
-    res.status(500).json({ error: "Failed to create service", message: error.message });
   }
-});
+);
+
 
 // 🔹 UPDATE a service (Admin only)
 router.put("/:slug", authMiddleware, adminMiddleware, upload.single("image"), async (req, res) => {

@@ -153,22 +153,22 @@ router.put(
   }
 );
 
-// 🔹 DELETE a blog (Admin only)
 router.delete("/:slug", authMiddleware, adminMiddleware, async (req, res) => {
-  const { slug } = req.params;
-
   try {
+    const { slug } = req.params;
+
     const deletedBlog = await PreviewBlog.findOneAndDelete({ slug });
 
     if (!deletedBlog) {
-      return res.status(404).json({ message: "Blog not found" });
+      return res.status(404).json({ message: "Preview blog not found" });
     }
 
-    res.json({ message: "Blog deleted successfully" });
+    res.status(200).json({ message: "Preview blog deleted successfully" });
   } catch (error) {
-    console.error("Error deleting blog:", error);
-    res.status(500).json({ error: "Server error deleting blog" });
+    console.error("Error deleting preview blog:", error);
+    res.status(500).json({ message: "Internal server error", error: error.message });
   }
 });
+
 
 module.exports = router;
